@@ -86,6 +86,9 @@
 
         console.log("RupertG Accounts Auth Ready");
 
+        // Get the URL to redirect to after login (default to your Notes app)
+        const continueUrl = new URLSearchParams(window.location.search).get('continue') || 'localhost';
+
         // DOM Elements
         const loginForm = document.getElementById('loginForm');
         const signupForm = document.getElementById('signupForm');
@@ -132,13 +135,9 @@
                 const user = userCredential.user;
                 
                 console.log(`Logged in as: ${user.email}`);
-                showSuccess(`Logged in as: ${user.email}`);
                 
-                // Show account management page
-                showAccountPage(user);
-                
-                // Reset form
-                loginForm.reset();
+                // Redirect to Notes app
+                window.location.href = continueUrl;
                 
             } catch (error) {
                 console.error('Login error:', error);
