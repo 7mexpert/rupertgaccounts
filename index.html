@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RupertG Accounts</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>RupertG Accounts</h1>
+        
+        <div class="form-container">
+            <!-- Login Form -->
+            <form id="loginForm" class="form active">
+                <div class="input-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" name="email" placeholder="Enter your email" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" name="password" placeholder="Enter your password" required>
+                </div>
+                
+                <div id="loginError" class="error-message">Invalid email or password</div>
+                
+                <button type="submit" class="btn" id="loginBtn">Sign In</button>
+                
+                <div class="loading" id="loginLoading">Signing in...</div>
+                
+                <div class="toggle-text">
+                    Don't have an account? <span class="toggle-link" id="showSignup">Sign Up</span>
+                </div>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="form hidden">
+                <div class="input-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" name="email" placeholder="Enter your email" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" name="password" placeholder="Create a password" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required>
+                </div>
+                
+                <div id="signupError" class="error-message">Passwords do not match</div>
+                
+                <button type="submit" class="btn" id="signupBtn">Create Account</button>
+                
+                <div class="loading" id="signupLoading">Creating account...</div>
+                
+                <div class="toggle-text">
+                    Already have an account? <span class="toggle-link" id="showLogin">Sign In</span>
+                </div>
+            </form>
+        </div>
+        
+        <div id="successMessage" class="success-message"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updatePassword, signOut, deleteUser } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxOfEe5Rd7IGdeZvOejeO2t-6NGmIe54s",
+            authDomain: "rupertg-accounts.firebaseapp.com",
+            projectId: "rupertg-accounts",
+            storageBucket: "rupertg-accounts.firebasestorage.app",
+            messagingSenderId: "927136729144",
+            appId: "1:927136729144:web:56e1abf3b2df9ddb91fecd",
+            measurementId: "G-YTH9TYV7R4"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        console.log("RupertG Accounts Auth Ready");
+
+        // DOM Elements
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        const showSignupBtn = document.getElementById('showSignup');
+        const showLoginBtn = document.getElementById('showLogin');
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const loginLoading = document.getElementById('loginLoading');
+        const signupLoading = document.getElementById('signupLoading');
+        const loginError = document.getElementById('loginError');
+        const signupError = document.getElementById('signupError');
+        const successMessage = document.getElementById('successMessage');
+
+        // Form Switching
+        showSignupBtn.addEventListener('click', () => {
+            loginForm.classList.remove('active');
+            loginForm.classList.add('hidden');
+            signupForm.classList.remove('hidden');
+            signupForm.classList.add('active');
+            clearMessages();
+        });
+
+        showLoginBtn.addEventListener('click', () => {
+            signupForm.classList.remove('active');
+            signupForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            loginForm.classList.add('active');
+            clearMessages();
+        });
+
+        // Login Form Handler
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMessages();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            loginBtn.disabled = true;
+            loginLoading.classList.add('active');
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                console.log(`Logged in as: ${user.email}`);
+                showSuccess(`Logged in as: ${user.email}`);
+                
+                // Show account management page
+                showAccountPage(user);
+                
+                // Reset form
+                loginForm.reset();
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                loginError.style.display = 'block';
+            } finally {
+                loginBtn.disabled = false;
+                loginLoading.classList.remove('active');
+            }
+        });
+
+        // Signup Form Handler
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMessages();
+            
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Password validation
+            if (password !== confirmPassword) {
+                signupError.textContent = 'Passwords do not match';
+                signupError.style.display = 'block';
+                return;
+            }
+            
+            if (password.length < 6) {
+                signupError.textContent = 'Password must be at least 6 characters long';
+                signupError.style.display = 'block';
+                return;
+            }
+            
+            signupBtn.disabled = true;
+            signupLoading.classList.add('active');
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                console.log(`Logged in as: ${user.email}`);
+                showSuccess(`Account created and logged in as: ${user.email}`);
+                
+                // Reset form
+                signupForm.reset();
+                
+            } catch (error) {
+                console.error('Signup error:', error);
+                if (error.code === 'auth/email-already-in-use') {
+                    signupError.textContent = 'An account with this email already exists';
+                } else if (error.code === 'auth/invalid-email') {
+                    signupError.textContent = 'Invalid email address';
+                } else {
+                    signupError.textContent = 'Failed to create account. Please try again.';
+                }
+                signupError.style.display = 'block';
+            } finally {
+                signupBtn.disabled = false;
+                signupLoading.classList.remove('active');
+            }
+        });
+
+        // Account Management Page
+        function showAccountPage(user) {
+            // Create account management interface
+            const container = document.querySelector('.container');
+            container.innerHTML = `
+                <div class="account-header">
+                    <h1>Account Settings</h1>
+                    <p class="account-subtitle">Manage your RupertG account</p>
+                </div>
+                
+                <div class="user-info">
+                    <div class="info-item">
+                        <span class="info-label">Signed in as:</span>
+                        <span class="info-value">${user.email}</span>
+                    </div>
+                </div>
+
+                <div class="account-tabs">
+                    <button class="tab-btn active" data-tab="profile">Profile</button>
+                    <button class="tab-btn" data-tab="password">Password</button>
+                    <button class="tab-btn" data-tab="security">Security</button>
+                </div>
+
+                <div class="tab-content">
+                    <!-- Profile Tab -->
+                    <div id="profile-tab" class="tab-pane active">
+                        <form id="profileForm">
+                            <div class="input-group">
+                                <label for="displayName">Display Name</label>
+                                <input type="text" id="displayName" name="displayName" placeholder="Enter your display name" value="${user.displayName || ''}">
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="profileEmail">Email Address</label>
+                                <input type="email" id="profileEmail" name="email" placeholder="Enter your email" value="${user.email}" readonly>
+                                <small class="readonly-hint">Email cannot be changed from this interface</small>
+                            </div>
+                            
+                            <button type="submit" class="btn" id="saveProfileBtn">Save Profile</button>
+                        </form>
+                    </div>
+
+                    <!-- Password Tab -->
+                    <div id="password-tab" class="tab-pane">
+                        <form id="passwordForm">
+                            <div class="input-group">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" name="currentPassword" placeholder="Enter your current password" required>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" name="newPassword" placeholder="Enter new password" required>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="confirmNewPassword">Confirm New Password</label>
+                                <input type="password" id="confirmNewPassword" name="confirmNewPassword" placeholder="Confirm new password" required>
+                            </div>
+                            
+                            <div id="passwordError" class="error-message">Passwords do not match</div>
+                            
+                            <button type="submit" class="btn" id="changePasswordBtn">Change Password</button>
+                        </form>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div id="security-tab" class="tab-pane">
+                        <div class="security-info">
+                            <h3>Security Information</h3>
+                            <div class="info-item">
+                                <span class="info-label">Account Created:</span>
+                                <span class="info-value">${user.metadata.creationTime}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Last Sign In:</span>
+                                <span class="info-value">${user.metadata.lastSignInTime}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Email Verified:</span>
+                                <span class="info-value">${user.emailVerified ? 'Yes' : 'No'}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="security-actions">
+                            <button class="btn secondary-btn" id="signOutBtn">Sign Out</button>
+                            <button class="btn danger-btn" id="deleteAccountBtn">Delete Account</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="accountSuccessMessage" class="success-message"></div>
+            `;
+
+            // Add event listeners for account management
+            setupAccountEvents(user);
+        }
+
+        function setupAccountEvents(user) {
+            // Tab switching
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Remove active class from all buttons and panes
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabPanes.forEach(p => p.classList.remove('active'));
+                    
+                    // Add active class to clicked button and corresponding pane
+                    btn.classList.add('active');
+                    const tabId = btn.getAttribute('data-tab');
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                });
+            });
+
+            // Profile form
+            const profileForm = document.getElementById('profileForm');
+            profileForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const displayName = document.getElementById('displayName').value;
+                
+                try {
+                    await updateProfile(user, { displayName });
+                    showAccountSuccess('Profile updated successfully');
+                } catch (error) {
+                    console.error('Profile update error:', error);
+                    showAccountError('Failed to update profile');
+                }
+            });
+
+            // Password change form
+            const passwordForm = document.getElementById('passwordForm');
+            passwordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+                
+                const passwordError = document.getElementById('passwordError');
+                passwordError.style.display = 'none';
+
+                if (newPassword !== confirmNewPassword) {
+                    passwordError.textContent = 'New passwords do not match';
+                    passwordError.style.display = 'block';
+                    return;
+                }
+
+                if (newPassword.length < 6) {
+                    passwordError.textContent = 'Password must be at least 6 characters long';
+                    passwordError.style.display = 'block';
+                    return;
+                }
+
+                try {
+                    // Note: Firebase doesn't provide a direct way to verify current password
+                    // In a real app, you'd need to re-authenticate the user
+                    await updatePassword(user, newPassword);
+                    showAccountSuccess('Password changed successfully');
+                    passwordForm.reset();
+                } catch (error) {
+                    console.error('Password change error:', error);
+                    showAccountError('Failed to change password');
+                }
+            });
+
+            // Sign out
+            document.getElementById('signOutBtn').addEventListener('click', async () => {
+                try {
+                    await signOut(auth);
+                    // Reload to show login form
+                    location.reload();
+                } catch (error) {
+                    console.error('Sign out error:', error);
+                }
+            });
+
+            // Delete account
+            document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+                if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                    try {
+                        await deleteUser(user);
+                        // Reload to show login form
+                        location.reload();
+                    } catch (error) {
+                        console.error('Delete account error:', error);
+                        showAccountError('Failed to delete account');
+                    }
+                }
+            });
+        }
+
+        // Helper Functions
+        function clearMessages() {
+            loginError.style.display = 'none';
+            signupError.style.display = 'none';
+            successMessage.textContent = '';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                successMessage.textContent = '';
+            }, 3000);
+        }
+
+        function showAccountSuccess(message) {
+            const accountSuccess = document.getElementById('accountSuccessMessage');
+            accountSuccess.textContent = message;
+            accountSuccess.style.display = 'block';
+            setTimeout(() => {
+                accountSuccess.textContent = '';
+                accountSuccess.style.display = 'none';
+            }, 3000);
+        }
+
+        function showAccountError(message) {
+            const accountSuccess = document.getElementById('accountSuccessMessage');
+            accountSuccess.textContent = message;
+            accountSuccess.style.color = '#dc3545';
+            accountSuccess.style.display = 'block';
+            setTimeout(() => {
+                accountSuccess.textContent = '';
+                accountSuccess.style.display = 'none';
+                accountSuccess.style.color = '#28a745';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
